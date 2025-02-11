@@ -4,16 +4,19 @@ import * as request from 'supertest';
 import { testApplication } from '../../../../test/test-app';
 import { UserRole } from '../../domains/user/user.interface';
 import { UsersService } from '../../domains/user/user.service';
+import { AuthService } from '../../domains/auth/auth.service';
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
   let usersService: UsersService;
+  let authService: AuthService;
 
   beforeAll(async () => {
     app = await testApplication();
     await app.init();
 
     usersService = app.get<UsersService>(UsersService);
+    authService = app.get<AuthService>(AuthService);
   });
 
   afterAll(async () => {
@@ -141,6 +144,16 @@ describe('AuthController (e2e)', () => {
         expect.arrayContaining(['Role must be either admin or user']),
       );
     });
+
+    it('should handle unexpected errors during signup', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      jest.spyOn(authService, 'signUp').mockRejectedValueOnce(unexpectedError);
+
+      await request(app.getHttpServer())
+        .post('/auth/signup')
+        .send(validSignupData)
+        .expect(500);
+    });
   });
 
   describe('POST /auth/signin', () => {
@@ -246,6 +259,19 @@ describe('AuthController (e2e)', () => {
           'Password must be between 4 and 20 characters',
         ]),
       );
+    });
+
+    it('should handle unexpected errors during signin', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      jest.spyOn(authService, 'signIn').mockRejectedValueOnce(unexpectedError);
+
+      await request(app.getHttpServer())
+        .post('/auth/signin')
+        .send({
+          email: 'test@example.com',
+          password: 'password123',
+        })
+        .expect(500);
     });
   });
 });

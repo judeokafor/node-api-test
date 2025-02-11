@@ -3,10 +3,17 @@ import * as request from 'supertest';
 import { testApplication } from '../../../../test/test-app';
 import { UserRole } from '../../domains/user/user.interface';
 import { AuthService } from '../../domains/auth/auth.service';
+import { UsersService } from '../../domains/user/user.service';
+import {
+  UserNotFoundError,
+  UnauthorizedUpdateError,
+  EmailInUseError,
+} from '../../domains/user/user.errors';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
   let authService: AuthService;
+  let usersService: UsersService;
 
   let adminToken: string;
   let userToken: string;
@@ -16,6 +23,7 @@ describe('UsersController (e2e)', () => {
     await app.init();
 
     authService = app.get<AuthService>(AuthService);
+    usersService = app.get<UsersService>(UsersService);
 
     // Create and sign in as admin
     const adminSignup = {
@@ -369,6 +377,18 @@ describe('UsersController (e2e)', () => {
         Object.keys(userResponse.body),
       );
     });
+
+    it('should handle unexpected errors when fetching user', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      jest
+        .spyOn(usersService, 'findUserById')
+        .mockRejectedValueOnce(unexpectedError);
+
+      await request(app.getHttpServer())
+        .get(`${baseEndpoint}/${testUserId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(500);
+    });
   });
 
   describe('DELETE /users/:id', () => {
@@ -507,6 +527,18 @@ describe('UsersController (e2e)', () => {
       expect(finalCheckResponse.body.message).toBe(
         `User with ID ${user.id} not found`,
       );
+    });
+
+    it('should handle unexpected errors during deletion', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      jest
+        .spyOn(usersService, 'deleteUser')
+        .mockRejectedValueOnce(unexpectedError);
+
+      await request(app.getHttpServer())
+        .delete(`${baseEndpoint}/${testUserId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(500);
     });
   });
 
@@ -666,6 +698,50 @@ describe('UsersController (e2e)', () => {
       expect(response.body.message).toEqual(
         expect.arrayContaining(['Please provide a valid email address']),
       );
+    });
+
+    it('should handle unexpected errors during update', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      jest
+        .spyOn(usersService, 'updateUser')
+        .mockRejectedValueOnce(unexpectedError);
+
+      await request(app.getHttpServer())
+        .patch(`${baseEndpoint}/${testUserId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'New Name' })
+        .expect(500);
+    });
+
+    it('should handle all error types during update', async () => {
+      const testCases = [
+        {
+          error: new UserNotFoundError('User not found'),
+          expectedStatus: 404,
+        },
+        {
+          error: new UnauthorizedUpdateError(),
+          expectedStatus: 403,
+        },
+        {
+          error: new EmailInUseError('Email in use'),
+          expectedStatus: 409,
+        },
+      ];
+
+      for (const testCase of testCases) {
+        jest
+          .spyOn(usersService, 'updateUser')
+          .mockRejectedValueOnce(testCase.error);
+
+        const response = await request(app.getHttpServer())
+          .patch(`${baseEndpoint}/${testUserId}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ name: 'New Name' })
+          .expect(testCase.expectedStatus);
+
+        expect(response.body.message).toBe(testCase.error.message);
+      }
     });
   });
 });
