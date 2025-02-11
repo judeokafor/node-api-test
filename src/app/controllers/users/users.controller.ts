@@ -78,6 +78,8 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @SetMinimumRoles(UserRole.ADMIN)
+  @UseGuards(HasMinimumRoleGuard)
   async findUserById(@Param() params: UUIDDto): Promise<UserResponseDto> {
     try {
       return await this.usersService.findUserById(params.id);

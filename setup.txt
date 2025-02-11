@@ -6,14 +6,14 @@ Move Database MOdule into app.MOdule ( how does this affect ORM Config, maybe mo
 Update ZOd validation code
 Use Create ZOD DTO
 Create Custom Decorator to get users
-Switch @Roles decorator to be an actual guard 
+Setup decorators folders, with decorator like `set-is-public` , get-user, set-roles to be an actual guard 
 Implement hasMinimum role guard.
 Implement Global Logger interceptor, such that i don't need a try catch in all routes
 Implement IUSer such that I don't need to depend on Entity abstraction
 Setup proper test containers using a  test set up to start the test containers.
 Setup integration tests close to the controller folder
 Set up Normative folder structure. -> controller -> domain ( service , repository )
-Rename `custom-pipes` to pipe
+Add customized pipes to app module.
 
 
 
@@ -23,9 +23,18 @@ domains ( auth, users )
 
 Implement a docker file to start up mysql server locally
 Change env naming to be more generic instead of MYSQL_HOST , better DB_HOST or instead, Database URI.
-Attempt to set up vite test as test runner.
+Attempt to set up vite test as test runner instead of jest
 
 Set up database migrations with Typeorm
 
 
-//////// CHANGE READ ME FILE
+//////// WRITE READ ME FILE
+Show test coverage in readme.
+discuss prequisite technology needed to run this service. What needs to be installed and running locally.
+Document readme to show how to start the service, run migrations, seed the database step by step.
+Add documentation to show a link to the swagger documentation when service is up and running.
+Document the endpoints in a tabular format  for a quick glance.
+Write down some coding principles used in the course of this implementation.
+Add Author Name.
+Title the Readme documentation.
+Make it abit fancy with emojis.
