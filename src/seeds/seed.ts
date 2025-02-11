@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+
 import { seedUsers } from './user.seed';
 import { mysqlConfig } from '../common/database/datasource';
 

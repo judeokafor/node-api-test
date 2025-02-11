@@ -1,4 +1,11 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  ConflictException,
+  UnauthorizedException,
+  HttpCode,
+} from '@nestjs/common';
 
 import {
   ApiBadRequestResponse,
@@ -9,17 +16,21 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
-import { AuthService } from 'src/app/domains/auth/auth.service';
+import { AuthService } from '../../domains/auth/auth.service';
 
 import { SignInRequestDto, SignUpRequestDto } from './dto/request.dto';
 import { SignInResponseDto, SignUpResponseDto } from './dto/response.dto';
-import {
-  SigninInParams,
-  SignUpParams,
-} from 'src/app/domains/auth/auth.interface';
 
-@ApiTags('User Authentication')
+import { SetIsPublic } from '../../../common/decorators/set-is-public.decorator';
+import { Mapper } from './mappers/auth-result.mapper';
+import {
+  EmailAlreadyExistsError,
+  InvalidCredentialsError,
+} from '../../domains/auth/auth.errors';
+
+@ApiTags('Authentication')
 @Controller('auth')
+@SetIsPublic()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -31,16 +42,33 @@ export class AuthController {
   @ApiBadRequestResponse()
   @ApiConflictResponse()
   async signup(@Body() body: SignUpRequestDto): Promise<SignUpResponseDto> {
-    return this.authService.signUp(body as SignUpParams); // type casting due to issues with @anatine/zod-nestjs mapping all properties to optional
+    try {
+      const data = await this.authService.signUp(body);
+      return Mapper.toAuthUser(data.user, data.token);
+    } catch (error) {
+      if (error instanceof EmailAlreadyExistsError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Post('/signin')
+  @HttpCode(200)
   @ApiOkResponse({
     type: SignInResponseDto,
     description: 'Signed in successfully',
   })
   @ApiUnauthorizedResponse()
   async signin(@Body() body: SignInRequestDto): Promise<SignInResponseDto> {
-    return this.authService.signIn(body as SigninInParams);
+    try {
+      const data = await this.authService.signIn(body);
+      return Mapper.toAuthUser(data.user, data.token);
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        throw new UnauthorizedException(error.message);
+      }
+      throw error;
+    }
   }
 }

@@ -1,35 +1,49 @@
-import { z } from 'zod';
-import { createZodDto } from '@anatine/zod-nestjs';
-import { extendApi } from '@anatine/zod-openapi';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsEnum, IsString, Length } from 'class-validator';
 
-import { UserRoleSchema } from 'src/app/domains/user/users.types';
+import { UserRole } from '../../../domains/user/user.interface';
 
-// Base schema with OpenAPI metadata
-const baseAuthSchema = z.object({
-  email: extendApi(z.string().email(), {
+/**
+ * DTO for user sign-in request
+ * @class SignInRequestDto
+ */
+export class SignInRequestDto {
+  @ApiProperty({
     description: 'User email address',
     example: 'user@example.com',
-  }),
-  password: extendApi(z.string().min(4).max(20), {
-    description: 'User password must be within (4-20 characters)',
+  })
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  email: string;
+
+  @ApiProperty({
+    description: 'User password (4-20 characters)',
     example: 'password123',
-  }),
-});
+    minLength: 4,
+    maxLength: 20,
+  })
+  @IsString({ message: 'Password must be a string' })
+  @Length(4, 20, { message: 'Password must be between 4 and 20 characters' })
+  password: string;
+}
 
-// Sign In Schema
-
-export class SignInRequestDto extends createZodDto(baseAuthSchema) {}
-
-// Sign Up Schema with additional fields
-const signUpSchema = baseAuthSchema.extend({
-  name: extendApi(z.string(), {
+/**
+ * DTO for user sign-up request
+ * Extends SignInRequestDto to include additional registration fields
+ * @class SignUpRequestDto
+ */
+export class SignUpRequestDto extends SignInRequestDto {
+  @ApiProperty({
     description: 'User full name',
     example: 'John Doe',
-  }),
-  role: extendApi(UserRoleSchema, {
-    description: 'User role',
-    example: 'user',
-  }),
-});
+  })
+  @IsString({ message: 'Name must be a string' })
+  name: string;
 
-export class SignUpRequestDto extends createZodDto(signUpSchema) {}
+  @ApiProperty({
+    description: 'User role',
+    example: UserRole.USER,
+    enum: UserRole,
+  })
+  @IsEnum(UserRole, { message: 'Role must be either admin or user' })
+  role: UserRole;
+}

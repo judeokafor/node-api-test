@@ -1,8 +1,8 @@
-import { IUser } from 'src/app/domains/user/user.interface';
+import { IUser } from '../../../domains/user/user.interface';
 import { SignUpResponseDto } from '../dto/response.dto';
 
 export class Mapper {
-  static toSignUpUserDto(user: IUser, token: string): SignUpResponseDto {
+  static toAuthUser(user: IUser, token: string): SignUpResponseDto {
     return {
       id: user.id,
       name: user.name,

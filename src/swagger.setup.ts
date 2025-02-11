@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { patchNestjsSwagger } from '@anatine/zod-nestjs';
 import * as packageJson from 'package.json';
 
 export const setupSwagger = (app: INestApplication) => {
@@ -19,7 +18,6 @@ export const setupSwagger = (app: INestApplication) => {
       'defaultBearerAuth',
     )
     .build();
-  patchNestjsSwagger();
   const document = SwaggerModule.createDocument(app, options);
-  SwaggerModule.setup(`api/docs`, app, document);
+  SwaggerModule.setup(`/api/docs`, app, document);
 };

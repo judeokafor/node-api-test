@@ -1,8 +1,7 @@
-import { BaseEntity } from 'src/common/database/base.entity';
-import { Entity, Column } from 'typeorm';
+import { BaseEntity } from '../../../common/database/base.entity';
+import { Entity, Column, Index } from 'typeorm';
 
-import { UserRole } from './users.types';
-import { IUser } from './user.interface';
+import { IUser, UserRole } from './user.interface';
 
 const USER_TABLE_NAME = 'users';
 
@@ -11,6 +10,7 @@ export class User extends BaseEntity implements IUser {
   @Column({ nullable: false })
   name: string;
 
+  @Index({ unique: true })
   @Column({ unique: true })
   email: string;
 
@@ -18,9 +18,10 @@ export class User extends BaseEntity implements IUser {
   password: string;
 
   @Column({
-    type: 'varchar',
-    length: 10,
-    default: 'user',
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+    nullable: false,
   })
   role: UserRole;
 }

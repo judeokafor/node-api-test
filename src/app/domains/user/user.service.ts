@@ -1,92 +1,164 @@
+import { Inject, Injectable } from '@nestjs/common';
 import {
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { User } from './user.entity';
+  CreateUserParams,
+  IUser,
+  UserRole,
+  UpdateUserParams,
+} from './user.interface';
+import {
+  UserNotFoundError,
+  SelfDeletionError,
+  InsufficientPermissionsError,
+  EmailInUseError,
+  UnauthorizedUpdateError,
+} from './user.errors';
+import { IUserRepository } from './repositories/user.repository.interface';
+import { IPaginatedResponse } from '../../../common/interface/pagination.interface';
 
-import { UsersRepository } from './user.repository';
-import { CreateUserParams, IUser } from './user.interface';
-import { UserRole } from './users.types';
-
+/**
+ * Service responsible for user-related business logic
+ */
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
   constructor(
-    @Inject(UsersRepository) private readonly usersRepository: UsersRepository,
+    @Inject('IUserRepository')
+    private readonly userRepository: IUserRepository,
   ) {}
 
-  async createUser(params: CreateUserParams): Promise<User> {
-    return await this.usersRepository.createUser(params);
+  /**
+   * Creates a new user
+   * @param params User creation parameters
+   * @returns Newly created user
+   */
+  async createUser(params: CreateUserParams): Promise<IUser> {
+    return this.userRepository.createUser(params);
   }
 
-  async findUserByEmail(email: string): Promise<IUser> {
-    return this.usersRepository.findUserByEmail(email);
+  /**
+   * Finds a user by their email address
+   * @param email User's email address
+   * @returns User if found, undefined otherwise
+   */
+  async findUserByEmail(email: string): Promise<IUser | undefined> {
+    return this.userRepository.findUserByEmail(email);
   }
 
-  async userMe(userId: string): Promise<IUser> {
-    return this.usersRepository.findUserById(userId);
-  }
-
+  /**
+   * Retrieves paginated list of users
+   * @param limit Maximum number of users to return
+   * @param page Page number
+   * @returns Paginated users result with metadata
+   */
   async findAll(
     limit: number,
     page: number,
-  ): Promise<{ users: IUser[]; total: number }> {
-    return await this.usersRepository.findAll(limit, page);
+  ): Promise<IPaginatedResponse<IUser>> {
+    return this.userRepository.findAll(limit, page);
   }
 
-  async findById(userId: string): Promise<IUser> {
-    try {
-      const user = await this.usersRepository.findUserById(userId);
-
-      if (!user) {
-        throw new NotFoundException(`User with ID ${userId} not found`);
-      }
-      return user;
-    } catch (error) {
-      this.logger.error({ stack: error?.stack, message: error?.message });
-      throw error;
-    }
-  }
-
+  /**
+   * Finds a user by their ID
+   * @param userId User's unique identifier
+   * @throws {UserNotFoundError} If user is not found
+   * @returns User if found
+   */
   async findUserById(userId: string): Promise<IUser> {
-    try {
-      const user = await this.usersRepository.findUserById(userId);
+    const user = await this.userRepository.findUserById(userId);
 
-      if (!user) {
-        throw new NotFoundException(`User with ID ${userId} not found`);
-      }
-
-      return user;
-    } catch (error) {
-      this.logger.error({ stack: error?.stack, message: error?.message });
-      throw error;
+    if (!user) {
+      throw new UserNotFoundError(userId);
     }
+
+    return user;
   }
 
+  /**
+   * Deletes a user from the system
+   * @param requestingUserId ID of the user making the request
+   * @param targetUserId ID of the user to be deleted
+   * @param role Role of the requesting user
+   * @throws {UserNotFoundError} If target user is not found
+   * @throws {SelfDeletionError} If user tries to delete themselves
+   * @throws {InsufficientPermissionsError} If user lacks required permissions
+   */
   async deleteUser(
     requestingUserId: string,
     targetUserId: string,
     role: UserRole,
   ): Promise<void> {
-    const userToDelete = await this.usersRepository.findUserById(targetUserId);
+    await this.validateUserDeletion(requestingUserId, targetUserId, role);
+    await this.userRepository.deleteUser(targetUserId);
+  }
+
+  /**
+   * Validates if a user can be deleted
+   * @private
+   */
+  private async validateUserDeletion(
+    requestingUserId: string,
+    targetUserId: string,
+    role: UserRole,
+  ): Promise<void> {
+    const userToDelete = await this.findUserById(targetUserId);
 
     if (!userToDelete) {
-      throw new NotFoundException(`User with ID ${targetUserId} not found`);
+      throw new UserNotFoundError(targetUserId);
     }
 
     if (requestingUserId === targetUserId) {
-      throw new ForbiddenException('You cannot delete yourself');
+      throw new SelfDeletionError();
     }
 
-    if (role !== 'admin') {
-      throw new ForbiddenException(
+    if (role !== UserRole.ADMIN) {
+      throw new InsufficientPermissionsError(
         'You do not have permission to delete users',
       );
     }
+  }
 
-    await this.usersRepository.deleteUser(targetUserId);
+  /**
+   * Updates a user's information
+   * @param requestingUserId ID of the user making the request
+   * @param targetUserId ID of the user to update
+   * @param data Update data
+   * @param role Role of the requesting user
+   * @throws {UserNotFoundError} If user not found
+   * @throws {UnauthorizedUpdateError} If user not authorized
+   * @throws {EmailInUseError} If email already in use
+   */
+  async updateUser(
+    requestingUserId: string,
+    targetUserId: string,
+    data: UpdateUserParams,
+    role: UserRole,
+  ): Promise<IUser> {
+    const targetUser = await this.findUserById(targetUserId);
+
+    if (!targetUser) {
+      throw new UserNotFoundError(targetUserId);
+    }
+
+    // Check authorization
+    if (requestingUserId !== targetUserId && role !== UserRole.ADMIN) {
+      throw new UnauthorizedUpdateError();
+    }
+
+    // Regular users can't update roles
+    if (role !== UserRole.ADMIN && data.role) {
+      throw new UnauthorizedUpdateError();
+    }
+
+    // Check if email is being updated and is not already in use
+    if (data.email && data.email !== targetUser.email) {
+      const existingUser = await this.userRepository.findUserByEmail(
+        data.email,
+      );
+
+      if (existingUser) {
+        throw new EmailInUseError(data.email);
+      }
+    }
+
+    return this.userRepository.updateUser(targetUserId, data);
   }
 }

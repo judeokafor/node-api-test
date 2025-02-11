@@ -1,5 +1,4 @@
-import { IUser } from '../user/user.interface';
-import { UserRole } from '../user/users.types';
+import { IUser, UserRole } from '../user/user.interface';
 
 export interface SigninInParams {
   email: string;
@@ -16,4 +15,9 @@ export interface SignUpParams {
 export interface AuthResult {
   token: string;
   user: IUser;
+}
+
+export interface JwtPayload {
+  id: string;
+  email: string;
 }

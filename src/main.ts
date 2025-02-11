@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { MainModule } from './main.module';
-import { setupSwagger } from './swagger.setup.';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
+
+import { MainModule } from './main.module';
+import { setupSwagger } from './swagger.setup';
 
 import * as packageJson from 'package.json';
-
-import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   try {

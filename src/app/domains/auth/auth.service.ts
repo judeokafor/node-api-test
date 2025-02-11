@@ -1,31 +1,36 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-
 import * as argon from 'argon2';
 
 import { UsersService } from '../user/user.service';
-import { CreateTokenResponse } from './auth.type';
-import { AuthResult, SigninInParams, SignUpParams } from './auth.interface';
+import {
+  AuthResult,
+  JwtPayload,
+  SigninInParams,
+  SignUpParams,
+} from './auth.interface';
+import {
+  EmailAlreadyExistsError,
+  InvalidCredentialsError,
+} from './auth.errors';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly usersService: UsersService,
-    private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async signUp(input: SignUpParams): Promise<AuthResult> {
     const { name, email, password, role } = input;
 
-    await this.checkDuplicateEmail(email);
+    const existingClient = await this.usersService.findUserByEmail(email);
+
+    if (existingClient) {
+      throw new EmailAlreadyExistsError(email);
+    }
 
     const hashedPassword = await argon.hash(password);
     const payload = {
@@ -36,14 +41,11 @@ export class AuthService {
     };
 
     const savedUser = await this.usersService.createUser(payload);
+    const token = this.createAuthToken(savedUser.id, savedUser.email);
 
-    const { access_token } = await this.createSignInToken(
-      savedUser.id,
-      savedUser.email,
-    );
     return {
       user: savedUser,
-      token: access_token,
+      token,
     };
   }
 
@@ -53,43 +55,29 @@ export class AuthService {
     const user = await this.usersService.findUserByEmail(email);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials provided');
+      throw new InvalidCredentialsError();
     }
 
-    const isPasswordMatch = await argon.verify(user?.password, password);
+    const isPasswordMatch = await argon.verify(user.password, password);
 
     if (!isPasswordMatch) {
-      throw new UnauthorizedException('Invalid credentials provided');
+      throw new InvalidCredentialsError();
     }
 
-    const { access_token } = await this.createSignInToken(user.id, user.email);
+    const token = this.createAuthToken(user.id, user.email);
 
-    return { user, token: access_token };
+    return { user, token };
   }
 
-  async createSignInToken(
-    userId: string,
-    email: string,
-  ): Promise<CreateTokenResponse> {
-    const token = this.jwtService.sign(
-      {
-        userId,
-        email,
-      },
-      {
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
-        secret: this.configService.get<string>('JWT_SECRET'),
-      },
-    );
+  private createAuthToken(userId: string, email: string): string {
+    const payload: JwtPayload = {
+      id: userId,
+      email,
+    };
 
-    return { access_token: token };
-  }
-
-  async checkDuplicateEmail(email: string): Promise<void> {
-    const existingClient = await this.usersService.findUserByEmail(email);
-
-    if (existingClient) {
-      throw new ConflictException('Email already in use.');
-    }
+    return this.jwtService.sign(payload, {
+      expiresIn: this.configService.getOrThrow<string>('JWT_EXPIRES_IN'),
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+    });
   }
 }
