@@ -20,9 +20,34 @@ This service provides a complete user management system with features including:
 Before running this service, ensure you have the following installed:
 
 - Node.js (v16 or higher)
-- MySQL (v8.0 or higher)
 - npm (v8 or higher)
-- Docker (for running tests)
+- Docker & Docker Compose (for development database and tests)
+
+> 💡 You can either use a local MySQL installation or run it via Docker Compose (recommended).
+
+## 🐳 Docker Database Setup
+
+You can quickly spin up a MySQL database using Docker Compose:
+
+```bash
+# Start MySQL container
+npm run docker:db:up
+
+# Stop MySQL container
+npm run docker:db:down
+
+# View MySQL container logs
+npm run docker:db:logs
+```
+
+The MySQL container will be available at:
+- Host: localhost
+- Port: 3306
+- Username: root
+- Password: root_password
+- Database: dev_db
+
+> 💡 Make sure you have Docker and Docker Compose installed on your machine.
 
 ## 🛠️ Installation
 
