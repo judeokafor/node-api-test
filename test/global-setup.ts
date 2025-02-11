@@ -3,7 +3,6 @@ import { StartedMySqlContainer } from '@testcontainers/mysql/build/mysql-contain
 import { DataSource } from 'typeorm';
 import { MysqlConnectionOptions } from 'typeorm/driver/mysql/MysqlConnectionOptions';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
-import { seed } from '../src/seeds/seed';
 
 let databaseContainer: StartedMySqlContainer;
 let dataSource: DataSource;
@@ -57,9 +56,6 @@ export default async function setup() {
 
     // Run migrations and seed
     await dataSource.runMigrations();
-    await seed(dataSource);
-
-    console.log('Test database seeded');
   } catch (error) {
     console.error('Database setup failed:', error);
 
